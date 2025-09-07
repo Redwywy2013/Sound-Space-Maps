@@ -10,3 +10,5 @@
     I have no idea who made these maps- Please DM me if one of them is yours, I would love to give you full credit!
   2:58 PM
     Added a counter for how many maps are fetched and ready to copy :3
+  3:08 PM
+    Fixed the Safari/IOS issue of, "Copy Failed!"
