@@ -19,3 +19,5 @@
     HOPEFULLY fixed the IOS issue
   3:46 PM
     Copies the URL instead of the map data, making the IOS issue fixed :D
+  5:43 PM
+    Added Drain Time, which is simply just the duration of the map
