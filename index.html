@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sound Space Maps</title>
+</head>
+<body>
+  <h2>Custom Maps</h2>
+
+  <button onclick="copyMap('https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/%5Bwater%5D%20Dangerous%20Slot%20-%20Laur')">
+    Dangerous Slot - Laur
+  </button>
+
+  <script>
+    async function copyMap(url) {
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        await navigator.clipboard.writeText(text);
+        alert('Copied map data to clipboard!');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
