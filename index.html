@@ -41,13 +41,12 @@
     }
     .notice b { color: var(--accent); font-weight: 500; }
 
-    /* Banner */
     .banner {
       width: 100%;
       height: 180px;
       background: url("https://tse1.mm.bing.net/th/id/OIP.l554qEd9uoB8t2HdHWoT9QHaEK?rs=1&pid=ImgDetMain&o=7&rm=3")
                   no-repeat center center;
-      background-size: contain;   /* show full image, no crop */
+      background-size: contain;
       background-color: var(--surface);
       border-bottom: 1px solid var(--border);
     }
@@ -67,7 +66,6 @@
       justify-content: center;
     }
 
-    /* Search */
     .search {
       display: flex;
       gap: 8px;
@@ -88,7 +86,6 @@
     .search input { flex: 1; min-width: 280px; }
     .search select { min-width: 140px; }
 
-    /* Content */
     .wrap {
       max-width: 1120px;
       margin: 0 auto;
@@ -102,14 +99,8 @@
       font-size: 14px;
       color: var(--muted);
     }
-    .status-bar.done {
-      color: #4ade80;
-      font-weight: 500;
-    }
-    .status-bar.error {
-      color: #f87171;
-      font-weight: 500;
-    }
+    .status-bar.done { color: #4ade80; font-weight: 500; }
+    .status-bar.error { color: #f87171; font-weight: 500; }
 
     .map-list {
       display: grid;
@@ -117,7 +108,6 @@
       gap: 16px;
     }
 
-    /* Cards */
     .map-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -137,15 +127,18 @@
     }
     .meta {
       font-size: 13px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       color: var(--muted);
     }
     .meta .label { font-weight: 500; margin-right: 4px; color: var(--muted); }
     .meta .value { color: var(--text); }
 
-    /* Buttons */
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
     .btn {
-      margin-top: 8px;
       background: var(--btn-bg);
       border: 1px solid var(--input-br);
       padding: 10px 12px;
@@ -153,7 +146,6 @@
       cursor: pointer;
       font-weight: 500;
       color: var(--text);
-      width: 100%;
       text-align: center;
     }
     .btn:hover { background: var(--btn-bg-h); }
@@ -162,10 +154,7 @@
       border-color: #27412c;
       color: #b7e4c7;
     }
-    .btn[disabled] {
-      opacity: .6;
-      cursor: not-allowed;
-    }
+    .btn[disabled] { opacity: .6; cursor: not-allowed; }
 
     footer {
       text-align: center;
@@ -176,7 +165,6 @@
       background: var(--surface-2);
     }
 
-    /* Changelog Tab */
     .changelog-tab {
       position: fixed;
       right: 0;
@@ -206,18 +194,10 @@
       z-index: 49;
     }
     .changelog-panel.open { right: 0; }
-    .changelog-panel h2 {
-      margin-top: 0;
-      font-size: 18px;
-      color: var(--accent);
-    }
-    .changelog-panel pre {
-      white-space: pre-wrap;
-      font-size: 13px;
-      line-height: 1.4;
-    }
+    .changelog-panel h2 { margin-top: 0; font-size: 18px; color: var(--accent); }
+    .changelog-panel pre { white-space: pre-wrap; font-size: 13px; line-height: 1.4; }
 
-    /* Manual copy overlay (last-resort) */
+    /* Manual copy overlay */
     .copy-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,.55);
       display: none; align-items: center; justify-content: center; z-index: 1000;
@@ -270,14 +250,13 @@
 
   <footer>Sound Space Maps Viewer • Powered by GitHub Pages</footer>
 
-  <!-- Changelog -->
   <div class="changelog-tab" id="changelogTab">📜 Changelog</div>
   <div class="changelog-panel" id="changelogPanel">
     <h2>Changelog</h2>
     <pre id="changelogContent">Loading...</pre>
   </div>
 
-  <!-- Manual copy overlay (last resort) -->
+  <!-- Manual copy overlay -->
   <div class="copy-overlay" id="copyOverlay">
     <div class="copy-modal" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
       <h3 id="copyTitle">Manual Copy</h3>
@@ -307,13 +286,11 @@
       overlayEl.style.display = "none";
     });
 
-    /* ========= Cache: key -> URL text from "Map Data:" ========= */
-    const urlCache = new Map(); // only stores the URL string found in each .sscm
-    // Wider Safari/iOS detection (handles iPadOS)
-    const ua = navigator.userAgent;
-    const isApple = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    const isSafariEngine = /AppleWebKit/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua);
-    const isSafari = isSafariEngine && (isApple || /Safari/i.test(ua));
+    /* ========= Caches ========= */
+    // key -> URL string from Map Data (if present)
+    const urlCache = new Map();
+    // key -> raw map text (preloaded if Map Data is a URL, or direct text)
+    const dataCache = new Map();
 
     /* ========= Helpers ========= */
     function parseSSCM(text) {
@@ -332,12 +309,9 @@
       });
       return data;
     }
+    const isHttpUrl = s => /^https?:\/\//i.test(s || "");
 
-    function isHttpUrl(s) {
-      return /^https?:\/\//i.test(s || "");
-    }
-
-    /* ========= Load maps (only fetch .sscm files to extract the URL string) ========= */
+    /* ========= Loader (preloads raw data if Map Data is a URL) ========= */
     async function loadMaps() {
       try {
         const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
@@ -356,7 +330,9 @@
           const map = parseSSCM(text);
 
           const key = String(i);
-          const btnId = `btn-${i}`;
+          const btnUrlId = `url-${i}`;
+          const btnRawId = `raw-${i}`;
+          const hasUrl = isHttpUrl(map.mapData);
 
           const card = document.createElement("div");
           card.className = "map-card";
@@ -364,30 +340,52 @@
           card.dataset.title  = (map.title  || "").toLowerCase();
           card.dataset.mapper = (map.mapper || "").toLowerCase();
 
-          // Only copy the URL inside "Map Data:" if it looks like a URL
-          let hasUrl = false;
-          if (isHttpUrl(map.mapData)) {
+          // Set caches & button states
+          let urlBtnHTML, rawBtnHTML;
+
+          if (hasUrl) {
             urlCache.set(key, map.mapData.trim());
-            hasUrl = true;
+            urlBtnHTML = `<button class="btn" id="${btnUrlId}">Copy URL</button>`;
+            rawBtnHTML = `<button class="btn" id="${btnRawId}" disabled>Preparing…</button>`;
+          } else {
+            urlBtnHTML = `<button class="btn" id="${btnUrlId}" disabled title="No URL in Map Data">No URL</button>`;
+            dataCache.set(key, map.mapData || "");
+            rawBtnHTML = `<button class="btn" id="${btnRawId}">Copy Raw Data</button>`;
           }
 
           card.innerHTML = `
             <h2>${map.song || "Untitled"}</h2>
-            <div class="meta">
-              <span class="label">Mapper:</span>
-              <span class="value">${map.mapper || "Unknown"}</span>
+            <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
+            <div class="btn-row">
+              ${urlBtnHTML}
+              ${rawBtnHTML}
             </div>
-            <button class="btn" id="${btnId}" ${hasUrl ? "" : "disabled title='No URL found in Map Data'"}>${
-              hasUrl ? "Copy Map URL" : "No URL in file"
-            }</button>
           `;
           container.appendChild(card);
 
-          // Click to copy the URL string instantly (no network in click)
-          const btn = document.getElementById(btnId);
+          // If URL exists, preload raw text now (no network during click)
           if (hasUrl) {
-            btn.addEventListener("click", () => copyUrlFromCache(key, btnId));
+            (async () => {
+              try {
+                const r = await fetch(map.mapData, { cache: "force-cache" });
+                const t = await r.text();
+                dataCache.set(key, t);
+                const btnRaw = document.getElementById(btnRawId);
+                if (btnRaw) { btnRaw.textContent = "Copy Raw Data"; btnRaw.disabled = false; }
+              } catch (e) {
+                console.error("Failed to preload raw data:", e);
+                const btnRaw = document.getElementById(btnRawId);
+                if (btnRaw) { btnRaw.textContent = "Load failed"; btnRaw.disabled = true; }
+              }
+            })();
           }
+
+          // Attach copy handlers (instant, from cache)
+          const urlBtn = document.getElementById(btnUrlId);
+          if (hasUrl && urlBtn) urlBtn.addEventListener("click", () => copyText(urlCache.get(key), btnUrlId, "Copy URL"));
+
+          const rawBtn = document.getElementById(btnRawId);
+          if (rawBtn) rawBtn.addEventListener("click", () => copyText(dataCache.get(key), btnRawId, "Copy Raw Data"));
 
           loaded++;
           statusEl.textContent = `Loading: ${loaded} / ${sscmFiles.length} Maps`;
@@ -402,57 +400,53 @@
       }
     }
 
-    /* ========= Copy just the URL string (modern → execCommand → manual overlay) ========= */
-    function copyUrlFromCache(key, btnId) {
+    /* ========= Copy utilities: modern → execCommand → manual overlay ========= */
+    function copyText(text, btnId, defaultLabel) {
       const button = document.getElementById(btnId);
-      const text = urlCache.get(key);
-
       if (!text) {
-        button.textContent = "No URL found";
-        setTimeout(() => (button.textContent = "Copy Map URL"), 1400);
+        if (button) {
+          button.textContent = "Not ready";
+          setTimeout(() => (button.textContent = defaultLabel), 1400);
+        }
         return;
       }
 
-      // 1) Modern Clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
-          successUI(button);
+          successUI(button, defaultLabel);
         }).catch(() => {
-          // 2) execCommand fallback
           if (!execCommandCopy(text)) {
-            // 3) Manual overlay (last resort)
             openManualCopy(text);
-            silentUI(button);
+            silentUI(button, defaultLabel);
           } else {
-            successUI(button);
+            successUI(button, defaultLabel);
           }
         });
         return;
       }
 
-      // 2) execCommand fallback directly
       if (!execCommandCopy(text)) {
         openManualCopy(text);
-        silentUI(button);
+        silentUI(button, defaultLabel);
       } else {
-        successUI(button);
+        successUI(button, defaultLabel);
       }
     }
 
     function execCommandCopy(text) {
       try {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        textarea.setAttribute("readonly", "");
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        textarea.style.left = "-9999px";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        textarea.setSelectionRange(0, textarea.value.length);
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
         const ok = document.execCommand("copy");
-        document.body.removeChild(textarea);
+        document.body.removeChild(ta);
         return ok;
       } catch {
         return false;
@@ -465,18 +459,18 @@
       setTimeout(() => { overlayText.focus(); overlayText.select(); }, 50);
     }
 
-    function successUI(button) {
+    function successUI(button, defaultLabel) {
+      if (!button) return;
       button.textContent = "Copied ✓";
       button.classList.add("copied");
       setTimeout(() => {
-        button.textContent = "Copy Map URL";
+        button.textContent = defaultLabel;
         button.classList.remove("copied");
       }, 1400);
     }
-
-    function silentUI(button) {
-      // Don’t flash "failed" when opening overlay; just reset label later
-      setTimeout(() => { if (button) button.textContent = "Copy Map URL"; }, 1400);
+    function silentUI(button, defaultLabel) {
+      if (!button) return;
+      setTimeout(() => { button.textContent = defaultLabel; }, 1400);
     }
 
     /* ========= Search ========= */
