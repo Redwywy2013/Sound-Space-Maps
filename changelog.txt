@@ -12,3 +12,8 @@
     Added a counter for how many maps are fetched and ready to copy :3
   3:08 PM
     Fixed the Safari/IOS issue of, "Copy Failed!"
+  3:15 PM
+    ...At least I thought I did D:
+  3:16 PM
+    Added 75 maps from Demikuu's Repo
+    HOPEFULLY fixed the IOS issue
