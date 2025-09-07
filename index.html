@@ -22,14 +22,13 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Inter", "Segoe UI", Roboto, system-ui, -apple-system, Arial, sans-serif;
+      font-family: "Inter", "Segoe UI", Roboto, system-ui, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       display: flex;
       flex-direction: column;
-      line-height: 1.45;
-      font-weight: 400;
       min-height: 100vh;
+      line-height: 1.5;
     }
 
     .notice {
@@ -42,18 +41,15 @@
     }
     .notice b { color: var(--accent); font-weight: 500; }
 
-    /* Banner image */
+    /* Banner */
     .banner {
-      text-align: center;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 0;
-    }
-    .banner img {
-      max-width: 360px;
       width: 100%;
-      height: auto;
-      display: inline-block;
+      height: 180px;
+      background: url("https://tse1.mm.bing.net/th/id/OIP.l554qEd9uoB8t2HdHWoT9QHaEK?rs=1&pid=ImgDetMain&o=7&rm=3")
+                  no-repeat center center;
+      background-size: contain;
+      background-color: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
 
     header {
@@ -71,7 +67,7 @@
       justify-content: center;
     }
 
-    /* Search bar */
+    /* Search */
     .search {
       display: flex;
       gap: 8px;
@@ -122,18 +118,14 @@
     .map-card h2 {
       margin: 0 0 6px;
       font-size: 16px;
-      color: var(--text);
       font-weight: 500;
     }
     .meta {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
       font-size: 13px;
-      color: var(--muted);
       margin-bottom: 8px;
+      color: var(--muted);
     }
-    .meta .label { color: var(--muted); }
+    .meta .label { font-weight: 500; margin-right: 4px; color: var(--muted); }
     .meta .value { color: var(--text); }
 
     /* Buttons */
@@ -164,6 +156,47 @@
       border-top: 1px solid var(--border);
       background: var(--surface-2);
     }
+
+    /* Changelog Tab */
+    .changelog-tab {
+      position: fixed;
+      right: 0;
+      top: 40%;
+      background: var(--accent);
+      color: #000;
+      padding: 10px 14px;
+      border-radius: 8px 0 0 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 50;
+    }
+    .changelog-panel {
+      position: fixed;
+      right: -400px;
+      top: 0;
+      height: 100%;
+      width: 400px;
+      max-width: 90%;
+      background: var(--surface-2);
+      border-left: 1px solid var(--border);
+      padding: 20px;
+      box-shadow: -2px 0 6px rgba(0,0,0,0.5);
+      overflow-y: auto;
+      transition: right 0.3s ease;
+      z-index: 49;
+    }
+    .changelog-panel.open { right: 0; }
+    .changelog-panel h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .changelog-panel pre {
+      white-space: pre-wrap;
+      font-size: 13px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -172,10 +205,7 @@
     please DM me on Discord <b>@redduy35</b>
   </div>
 
-  <!-- Banner -->
-  <div class="banner">
-    <img src="data:image/webp;base64,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" alt="Sound Space Banner">
-  </div>
+  <div class="banner"></div>
 
   <header>
     <div class="header-inner">
@@ -197,15 +227,24 @@
 
   <footer>Sound Space Maps Viewer • Powered by GitHub Pages</footer>
 
+  <!-- Changelog -->
+  <div class="changelog-tab" id="changelogTab">📜 Changelog</div>
+  <div class="changelog-panel" id="changelogPanel">
+    <h2>Changelog</h2>
+    <pre id="changelogContent">Loading...</pre>
+  </div>
+
   <script>
     const repoOwner = "redwywy2013";
     const repoName  = "Sound-Space-Maps";
-    const folder    = "maps";
+    const branch    = "main";   // adjust if needed
+    const mapsFolder = "maps";
 
     const container   = document.getElementById("maps");
     const searchInput = document.getElementById("searchInput");
     const searchField = document.getElementById("searchField");
 
+    /* --- Parse SSCM --- */
     function parseSSCM(text) {
       const data = {};
       text.split("\n").forEach(line => {
@@ -215,7 +254,7 @@
           data.song = line.replace("Artist & Title:", "").trim();
           const parts = data.song.split(" - ");
           data.artist = parts.length > 1 ? parts[0] : "";
-          data.title = parts.length > 1 ? parts.slice(1).join(" - ") : parts[0];
+          data.title  = parts.length > 1 ? parts.slice(1).join(" - ") : parts[0];
         } else if (line.startsWith("Mapper:")) {
           data.mapper = line.replace("Mapper:", "").trim();
         }
@@ -223,11 +262,11 @@
       return data;
     }
 
+    /* --- Load Maps --- */
     async function loadMaps() {
       try {
-        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folder}`;
+        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
         const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error("Failed to load repository contents.");
         const files = await res.json();
         const sscmFiles = files.filter(f => f.name.endsWith(".sscm"));
 
@@ -245,13 +284,8 @@
 
           card.innerHTML = `
             <h2>${map.song || "Untitled"}</h2>
-            <div class="meta">
-              <span class="label">Mapper:</span>
-              <span class="value">${map.mapper || "Unknown"}</span>
-            </div>
-            <button class="btn" id="btn-${i}" onclick="copyMap('${map.mapData}','btn-${i}')">
-              Copy Map Data
-            </button>
+            <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
+            <button class="btn" id="btn-${i}" onclick="copyMap('${map.mapData}','btn-${i}')">Copy Map Data</button>
           `;
           container.appendChild(card);
         }
@@ -260,6 +294,7 @@
       }
     }
 
+    /* --- Copy Button --- */
     async function copyMap(urlOrData, btnId) {
       const button = document.getElementById(btnId);
       try {
@@ -275,12 +310,13 @@
           button.textContent = "Copy Map Data";
           button.classList.remove("copied");
         }, 1600);
-      } catch (err) {
+      } catch {
         button.textContent = "Copy failed";
         setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
       }
     }
 
+    /* --- Search --- */
     searchInput.addEventListener("input", filterMaps);
     searchField.addEventListener("change", filterMaps);
 
@@ -303,7 +339,29 @@
       });
     }
 
+    /* --- Changelog --- */
+    const changelogTab = document.getElementById("changelogTab");
+    const changelogPanel = document.getElementById("changelogPanel");
+    const changelogContent = document.getElementById("changelogContent");
+
+    changelogTab.addEventListener("click", () => {
+      changelogPanel.classList.toggle("open");
+    });
+
+    async function loadChangelog() {
+      try {
+        const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/changelog.txt`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Changelog not found");
+        const text = await res.text();
+        changelogContent.textContent = text;
+      } catch {
+        changelogContent.textContent = "No changelog available.";
+      }
+    }
+
     loadMaps();
+    loadChangelog();
   </script>
 </body>
 </html>
