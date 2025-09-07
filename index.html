@@ -1,23 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Sound Space Maps</title>
+  <meta charset="UTF-8">
+  <title>Sound Space Custom Maps</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #eee;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #00ffcc;
+    }
+    .map-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .map-card {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.6);
+    }
+    .map-card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: #ffcc00;
+    }
+    .map-card p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    button {
+      background: #00ffcc;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #00cc99;
+    }
+  </style>
 </head>
 <body>
-  <h2>Custom Maps</h2>
-
-  <button onclick="copyMap('https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/%5Bwater%5D%20Dangerous%20Slot%20-%20Laur')">
-    Dangerous Slot - Laur
-  </button>
+  <h1>🎵 Sound Space Custom Maps 🎵</h1>
+  <div id="maps" class="map-list"></div>
 
   <script>
+    // === Add your maps here ===
+    const maps = [
+      {
+        url: "https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/%5Bwater%5D%20Dangerous%20Slot%20-%20Laur",
+        mapper: "Laur",
+        song: "Dangerous Slot - Laur"
+      },
+      {
+        url: "https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/examplemap.osu",
+        mapper: "Redwywy",
+        song: "Example Artist - Example Title"
+      }
+    ];
+
+    // === Render maps ===
+    const container = document.getElementById("maps");
+
+    maps.forEach(map => {
+      const card = document.createElement("div");
+      card.className = "map-card";
+      card.innerHTML = `
+        <h2>${map.song}</h2>
+        <p><b>Mapper:</b> ${map.mapper}</p>
+        <button onclick="copyMap('${map.url}')">Copy Map Data</button>
+      `;
+      container.appendChild(card);
+    });
+
     async function copyMap(url) {
       try {
         const res = await fetch(url);
         const text = await res.text();
         await navigator.clipboard.writeText(text);
-        alert('Copied map data to clipboard!');
+        alert('Copied map data for: ' + url);
       } catch (err) {
         alert('Error: ' + err.message);
       }
