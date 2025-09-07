@@ -323,6 +323,20 @@
       return m ? parseInt(m[1], 10) : null;
     }
 
+    // Extract the first note token (2nd comma-separated token), and the last '|' value within it.
+    // For "6603735676,0|2|0,0|4|38" -> firstNoteToken = "0|2|0", lastVal = "0"
+    function extractFirstNoteInfo(raw) {
+      if (!raw) return { token: null, lastVal: null };
+      // consider only the first line (if multiple lines)
+      const firstLine = raw.split(/\r?\n/)[0] || raw;
+      const parts = firstLine.split(",");
+      if (parts.length < 2) return { token: null, lastVal: null };
+      const token = parts[1].trim();
+      const segs = token.split("|");
+      const lastVal = segs.length ? segs[segs.length - 1].trim() : null;
+      return { token, lastVal };
+    }
+
     // Format ms → "SS.ss" and "M:SS.ss"
     function formatDrain(ms) {
       if (ms == null || isNaN(ms)) return null;
@@ -338,6 +352,16 @@
     function setDrainLabel(el, ms) {
       const f = formatDrain(ms);
       el.textContent = f ? `${f.secondsLabel}s (${f.mmssLabel})` : "N/A";
+    }
+
+    function setFirstNoteLabel(el, info) {
+      if (!info || !info.token) {
+        el.textContent = "N/A";
+        el.removeAttribute("title");
+        return;
+      }
+      el.textContent = info.lastVal ?? "N/A";
+      el.title = `First note token: ${info.token}`;
     }
 
     /* ========= Loader (preloads raw data if Map Data is a URL) ========= */
@@ -362,6 +386,7 @@
           const btnUrlId = `url-${i}`;
           const btnRawId = `raw-${i}`;
           const drainId  = `drain-${i}`;
+          const fnoteId  = `fnote-${i}`;
           const hasUrl = isHttpUrl(map.mapData);
 
           const card = document.createElement("div");
@@ -370,19 +395,23 @@
           card.dataset.title  = (map.title  || "").toLowerCase();
           card.dataset.mapper = (map.mapper || "").toLowerCase();
 
-          let urlBtnHTML, rawBtnHTML, drainHTML;
+          let urlBtnHTML, rawBtnHTML, drainHTML, fnoteHTML;
 
           if (hasUrl) {
             urlCache.set(key, map.mapData.trim());
             urlBtnHTML = `<button class="btn" id="${btnUrlId}">Copy URL</button>`;
             rawBtnHTML = `<button class="btn" id="${btnRawId}" disabled>Preparing…</button>`;
             drainHTML  = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">Loading…</span>`;
+            fnoteHTML  = `<span class="label">First Note (last):</span><span class="value" id="${fnoteId}">Loading…</span>`;
           } else {
             urlBtnHTML = `<button class="btn" id="${btnUrlId}" disabled title="No URL in Map Data">No URL</button>`;
             dataCache.set(key, map.mapData || "");
             rawBtnHTML = `<button class="btn" id="${btnRawId}">Copy Raw Data</button>`;
+
             const ms = extractDrainMs(map.mapData || "");
+            const info = extractFirstNoteInfo(map.mapData || "");
             drainHTML = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">${formatDrain(ms) ? `${formatDrain(ms).secondsLabel}s (${formatDrain(ms).mmssLabel})` : "N/A"}</span>`;
+            fnoteHTML = `<span class="label">First Note (last):</span><span class="value" id="${fnoteId}" title="${info.token ? `First note token: ${info.token}` : ""}">${info.lastVal ?? "N/A"}</span>`;
           }
 
           card.innerHTML = `
@@ -390,6 +419,7 @@
             <div class="meta">
               <span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span>
               ${drainHTML}
+              ${fnoteHTML}
             </div>
             <div class="btn-row">
               ${urlBtnHTML}
@@ -398,7 +428,7 @@
           `;
           container.appendChild(card);
 
-          // If URL exists, preload raw text now (no network during click) and compute drain time
+          // If URL exists, preload raw text now (no network during click) and compute drain + first note
           if (hasUrl) {
             (async () => {
               try {
@@ -414,12 +444,20 @@
                   const ms = extractDrainMs(t);
                   setDrainLabel(drainEl, ms);
                 }
+
+                const fnoteEl = document.getElementById(fnoteId);
+                if (fnoteEl) {
+                  const info = extractFirstNoteInfo(t);
+                  setFirstNoteLabel(fnoteEl, info);
+                }
               } catch (e) {
                 console.error("Failed to preload raw data:", e);
                 const rawBtn = document.getElementById(btnRawId);
                 if (rawBtn) { rawBtn.textContent = "Load failed"; rawBtn.disabled = true; }
                 const drainEl = document.getElementById(drainId);
                 if (drainEl) drainEl.textContent = "N/A";
+                const fnoteEl = document.getElementById(fnoteId);
+                if (fnoteEl) fnoteEl.textContent = "N/A";
               }
             })();
           }
