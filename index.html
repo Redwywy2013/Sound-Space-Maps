@@ -324,17 +324,22 @@
     }
 
     // Extract the first note token (2nd comma-separated token), and the last '|' value within it.
-    // For "6603735676,0|2|0,0|4|38" -> firstNoteToken = "0|2|0", lastVal = "0"
     function extractFirstNoteInfo(raw) {
       if (!raw) return { token: null, lastVal: null };
-      // consider only the first line (if multiple lines)
-      const firstLine = raw.split(/\r?\n/)[0] || raw;
+      const firstLine = (raw.split(/\r?\n/).find(l => l.trim().length > 0)) || raw;
       const parts = firstLine.split(",");
       if (parts.length < 2) return { token: null, lastVal: null };
       const token = parts[1].trim();
       const segs = token.split("|");
       const lastVal = segs.length ? segs[segs.length - 1].trim() : null;
       return { token, lastVal };
+    }
+
+    // Count commas across the entire raw string = number of notes
+    function countNotes(raw) {
+      if (!raw) return null;
+      const m = raw.match(/,/g);
+      return m ? m.length : 0;
     }
 
     // Format ms → "SS.ss" and "M:SS.ss"
@@ -364,7 +369,12 @@
       el.title = `First note token: ${info.token}`;
     }
 
-    /* ========= Loader (preloads raw data if Map Data is a URL) ========= */
+    function setNotesLabel(el, raw) {
+      const n = countNotes(raw);
+      el.textContent = (n == null) ? "N/A" : `${n}`;
+    }
+
+    /* ========= Loader ========= */
     async function loadMaps() {
       try {
         const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
@@ -387,7 +397,8 @@
           const btnRawId = `raw-${i}`;
           const drainId  = `drain-${i}`;
           const fnoteId  = `fnote-${i}`;
-          const hasUrl = isHttpUrl(map.mapData);
+          const notesId  = `notes-${i}`;
+          const hasUrl   = isHttpUrl(map.mapData);
 
           const card = document.createElement("div");
           card.className = "map-card";
@@ -395,7 +406,7 @@
           card.dataset.title  = (map.title  || "").toLowerCase();
           card.dataset.mapper = (map.mapper || "").toLowerCase();
 
-          let urlBtnHTML, rawBtnHTML, drainHTML, fnoteHTML;
+          let urlBtnHTML, rawBtnHTML, drainHTML, fnoteHTML, notesHTML;
 
           if (hasUrl) {
             urlCache.set(key, map.mapData.trim());
@@ -403,15 +414,18 @@
             rawBtnHTML = `<button class="btn" id="${btnRawId}" disabled>Preparing…</button>`;
             drainHTML  = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">Loading…</span>`;
             fnoteHTML  = `<span class="label">First Note (last):</span><span class="value" id="${fnoteId}">Loading…</span>`;
+            notesHTML  = `<span class="label">Notes:</span><span class="value" id="${notesId}">Loading…</span>`;
           } else {
             urlBtnHTML = `<button class="btn" id="${btnUrlId}" disabled title="No URL in Map Data">No URL</button>`;
-            dataCache.set(key, map.mapData || "");
+            const raw = map.mapData || "";
+            dataCache.set(key, raw);
             rawBtnHTML = `<button class="btn" id="${btnRawId}">Copy Raw Data</button>`;
 
-            const ms = extractDrainMs(map.mapData || "");
-            const info = extractFirstNoteInfo(map.mapData || "");
+            const ms = extractDrainMs(raw);
+            const info = extractFirstNoteInfo(raw);
             drainHTML = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">${formatDrain(ms) ? `${formatDrain(ms).secondsLabel}s (${formatDrain(ms).mmssLabel})` : "N/A"}</span>`;
             fnoteHTML = `<span class="label">First Note (last):</span><span class="value" id="${fnoteId}" title="${info.token ? `First note token: ${info.token}` : ""}">${info.lastVal ?? "N/A"}</span>`;
+            notesHTML = `<span class="label">Notes:</span><span class="value" id="${notesId}">${countNotes(raw) ?? "N/A"}</span>`;
           }
 
           card.innerHTML = `
@@ -420,6 +434,7 @@
               <span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span>
               ${drainHTML}
               ${fnoteHTML}
+              ${notesHTML}
             </div>
             <div class="btn-row">
               ${urlBtnHTML}
@@ -428,7 +443,7 @@
           `;
           container.appendChild(card);
 
-          // If URL exists, preload raw text now (no network during click) and compute drain + first note
+          // If URL exists, preload raw text (for raw copy & stats)
           if (hasUrl) {
             (async () => {
               try {
@@ -436,28 +451,31 @@
                 const t = await r.text();
                 dataCache.set(key, t);
 
+                // Enable "Copy Raw Data"
                 const rawBtn = document.getElementById(btnRawId);
                 if (rawBtn) { rawBtn.textContent = "Copy Raw Data"; rawBtn.disabled = false; }
 
+                // Compute stats
                 const drainEl = document.getElementById(drainId);
-                if (drainEl) {
-                  const ms = extractDrainMs(t);
-                  setDrainLabel(drainEl, ms);
-                }
+                if (drainEl) setDrainLabel(drainEl, extractDrainMs(t));
 
                 const fnoteEl = document.getElementById(fnoteId);
-                if (fnoteEl) {
-                  const info = extractFirstNoteInfo(t);
-                  setFirstNoteLabel(fnoteEl, info);
-                }
+                if (fnoteEl) setFirstNoteLabel(fnoteEl, extractFirstNoteInfo(t));
+
+                const notesEl = document.getElementById(notesId);
+                if (notesEl) setNotesLabel(notesEl, t);
+
               } catch (e) {
                 console.error("Failed to preload raw data:", e);
                 const rawBtn = document.getElementById(btnRawId);
                 if (rawBtn) { rawBtn.textContent = "Load failed"; rawBtn.disabled = true; }
+
                 const drainEl = document.getElementById(drainId);
                 if (drainEl) drainEl.textContent = "N/A";
                 const fnoteEl = document.getElementById(fnoteId);
                 if (fnoteEl) fnoteEl.textContent = "N/A";
+                const notesEl = document.getElementById(notesId);
+                if (notesEl) notesEl.textContent = "N/A";
               }
             })();
           }
