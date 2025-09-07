@@ -320,23 +320,23 @@
         statusEl.classList.add("error");
       }
     }
+    
+// Detect Safari/iOS (ignores Chrome/Android)
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    async function copyMap(urlOrData, btnId) {
+async function copyMap(urlOrData, btnId) {
   const button = document.getElementById(btnId);
   try {
     let text = urlOrData;
 
-    // If it's a URL, fetch it first
+    // If it's a URL, fetch its contents first
     if (/^https?:\/\//i.test(urlOrData)) {
       const res = await fetch(urlOrData);
       text = await res.text();
     }
 
-    // Try modern Clipboard API
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback for Safari/iOS
+    if (isSafari) {
+      // Always use fallback for Safari
       const textarea = document.createElement("textarea");
       textarea.value = text;
       textarea.style.position = "fixed";
@@ -346,6 +346,9 @@
       textarea.select();
       document.execCommand("copy");
       document.body.removeChild(textarea);
+    } else {
+      // Use modern Clipboard API
+      await navigator.clipboard.writeText(text);
     }
 
     // Success feedback
