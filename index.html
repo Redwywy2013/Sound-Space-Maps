@@ -59,39 +59,63 @@
   <div id="maps" class="map-list"></div>
 
   <script>
-    // === Add your maps here ===
-    const maps = [
-      {
-        url: "https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/%5Bwater%5D%20Dangerous%20Slot%20-%20Laur",
-        mapper: "Laur",
-        song: "Dangerous Slot - Laur"
-      },
-      {
-        url: "https://raw.githubusercontent.com/auxsyo/new-soundspace-maps/refs/heads/main/examplemap.osu",
-        mapper: "Redwywy",
-        song: "Example Artist - Example Title"
-      }
-    ];
+    const repoOwner = "redwywy2013";
+    const repoName = "Sound-Space-Maps";
+    const folder = "maps";
 
-    // === Render maps ===
     const container = document.getElementById("maps");
 
-    maps.forEach((map, index) => {
-      const card = document.createElement("div");
-      card.className = "map-card";
-      card.innerHTML = `
-        <h2>${map.song}</h2>
-        <p><b>Mapper:</b> ${map.mapper}</p>
-        <button id="btn-${index}" onclick="copyMap('${map.url}', 'btn-${index}')">Copy Map Data</button>
-      `;
-      container.appendChild(card);
-    });
+    function parseSSCM(text) {
+      const data = {};
+      text.split("\n").forEach(line => {
+        if (line.startsWith("Map Data:")) {
+          data.mapData = line.replace("Map Data:", "").trim();
+        } else if (line.startsWith("Artist & Title:")) {
+          data.song = line.replace("Artist & Title:", "").trim();
+        } else if (line.startsWith("Mapper:")) {
+          data.mapper = line.replace("Mapper:", "").trim();
+        }
+      });
+      return data;
+    }
 
-    async function copyMap(url, btnId) {
+    async function loadMaps() {
+      try {
+        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folder}`;
+        const res = await fetch(apiUrl);
+        const files = await res.json();
+
+        // Only process .sscm files
+        const sscmFiles = files.filter(f => f.name.endsWith(".sscm"));
+
+        for (let i = 0; i < sscmFiles.length; i++) {
+          const file = sscmFiles[i];
+          const resFile = await fetch(file.download_url);
+          const text = await resFile.text();
+          const map = parseSSCM(text);
+
+          const card = document.createElement("div");
+          card.className = "map-card";
+          card.innerHTML = `
+            <h2>${map.song}</h2>
+            <p><b>Mapper:</b> ${map.mapper}</p>
+            <button id="btn-${i}" onclick="copyMap('${map.mapData}', 'btn-${i}')">Copy Map Data</button>
+          `;
+          container.appendChild(card);
+        }
+      } catch (err) {
+        console.error("Error loading maps:", err);
+      }
+    }
+
+    async function copyMap(urlOrData, btnId) {
       const button = document.getElementById(btnId);
       try {
-        const res = await fetch(url);
-        const text = await res.text();
+        let text = urlOrData;
+        if (/^https?:\/\//i.test(urlOrData)) {
+          const res = await fetch(urlOrData);
+          text = await res.text();
+        }
         await navigator.clipboard.writeText(text);
         button.textContent = "✅ Copied Successfully!";
         button.classList.add("copied");
@@ -99,7 +123,7 @@
         setTimeout(() => {
           button.textContent = "Copy Map Data";
           button.classList.remove("copied");
-        }, 2000); // reset after 2 seconds
+        }, 2000);
       } catch (err) {
         button.textContent = "❌ Copy Failed";
         setTimeout(() => {
@@ -107,6 +131,8 @@
         }, 2000);
       }
     }
+
+    loadMaps();
   </script>
 </body>
 </html>
