@@ -129,8 +129,12 @@
       font-size: 13px;
       margin-bottom: 10px;
       color: var(--muted);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 8px;
+      align-items: center;
     }
-    .meta .label { font-weight: 500; margin-right: 4px; color: var(--muted); }
+    .meta .label { font-weight: 500; color: var(--muted); }
     .meta .value { color: var(--text); }
 
     .btn-row {
@@ -309,7 +313,32 @@
       });
       return data;
     }
+
     const isHttpUrl = s => /^https?:\/\//i.test(s || "");
+
+    // Extract last number after the final "|" (milliseconds). Returns number or null.
+    function extractDrainMs(raw) {
+      if (!raw) return null;
+      const m = raw.match(/\|(\d+)\s*$/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    // Format ms → "SS.ss" and "M:SS.ss"
+    function formatDrain(ms) {
+      if (ms == null || isNaN(ms)) return null;
+      const secondsTwo = (Math.round(ms / 10) / 100).toFixed(2); // e.g., 95.81
+      const totalSec = Math.floor(ms / 1000);
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      const hundredths = String(Math.floor((ms % 1000) / 10)).padStart(2, "0");
+      const mmss = `${m}:${String(s).padStart(2, "0")}.${hundredths}`;
+      return { secondsLabel: secondsTwo, mmssLabel: mmss };
+    }
+
+    function setDrainLabel(el, ms) {
+      const f = formatDrain(ms);
+      el.textContent = f ? `${f.secondsLabel}s (${f.mmssLabel})` : "N/A";
+    }
 
     /* ========= Loader (preloads raw data if Map Data is a URL) ========= */
     async function loadMaps() {
@@ -332,6 +361,7 @@
           const key = String(i);
           const btnUrlId = `url-${i}`;
           const btnRawId = `raw-${i}`;
+          const drainId  = `drain-${i}`;
           const hasUrl = isHttpUrl(map.mapData);
 
           const card = document.createElement("div");
@@ -340,22 +370,27 @@
           card.dataset.title  = (map.title  || "").toLowerCase();
           card.dataset.mapper = (map.mapper || "").toLowerCase();
 
-          // Set caches & button states
-          let urlBtnHTML, rawBtnHTML;
+          let urlBtnHTML, rawBtnHTML, drainHTML;
 
           if (hasUrl) {
             urlCache.set(key, map.mapData.trim());
             urlBtnHTML = `<button class="btn" id="${btnUrlId}">Copy URL</button>`;
             rawBtnHTML = `<button class="btn" id="${btnRawId}" disabled>Preparing…</button>`;
+            drainHTML  = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">Loading…</span>`;
           } else {
             urlBtnHTML = `<button class="btn" id="${btnUrlId}" disabled title="No URL in Map Data">No URL</button>`;
             dataCache.set(key, map.mapData || "");
             rawBtnHTML = `<button class="btn" id="${btnRawId}">Copy Raw Data</button>`;
+            const ms = extractDrainMs(map.mapData || "");
+            drainHTML = `<span class="label">Drain Time:</span><span class="value" id="${drainId}">${formatDrain(ms) ? `${formatDrain(ms).secondsLabel}s (${formatDrain(ms).mmssLabel})` : "N/A"}</span>`;
           }
 
           card.innerHTML = `
             <h2>${map.song || "Untitled"}</h2>
-            <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
+            <div class="meta">
+              <span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span>
+              ${drainHTML}
+            </div>
             <div class="btn-row">
               ${urlBtnHTML}
               ${rawBtnHTML}
@@ -363,19 +398,28 @@
           `;
           container.appendChild(card);
 
-          // If URL exists, preload raw text now (no network during click)
+          // If URL exists, preload raw text now (no network during click) and compute drain time
           if (hasUrl) {
             (async () => {
               try {
                 const r = await fetch(map.mapData, { cache: "force-cache" });
                 const t = await r.text();
                 dataCache.set(key, t);
-                const btnRaw = document.getElementById(btnRawId);
-                if (btnRaw) { btnRaw.textContent = "Copy Raw Data"; btnRaw.disabled = false; }
+
+                const rawBtn = document.getElementById(btnRawId);
+                if (rawBtn) { rawBtn.textContent = "Copy Raw Data"; rawBtn.disabled = false; }
+
+                const drainEl = document.getElementById(drainId);
+                if (drainEl) {
+                  const ms = extractDrainMs(t);
+                  setDrainLabel(drainEl, ms);
+                }
               } catch (e) {
                 console.error("Failed to preload raw data:", e);
-                const btnRaw = document.getElementById(btnRawId);
-                if (btnRaw) { btnRaw.textContent = "Load failed"; btnRaw.disabled = true; }
+                const rawBtn = document.getElementById(btnRawId);
+                if (rawBtn) { rawBtn.textContent = "Load failed"; rawBtn.disabled = true; }
+                const drainEl = document.getElementById(drainId);
+                if (drainEl) drainEl.textContent = "N/A";
               }
             })();
           }
