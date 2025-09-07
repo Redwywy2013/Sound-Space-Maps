@@ -322,25 +322,46 @@
     }
 
     async function copyMap(urlOrData, btnId) {
-      const button = document.getElementById(btnId);
-      try {
-        let text = urlOrData;
-        if (/^https?:\/\//i.test(urlOrData)) {
-          const res = await fetch(urlOrData);
-          text = await res.text();
-        }
-        await navigator.clipboard.writeText(text);
-        button.textContent = "Copied ✓";
-        button.classList.add("copied");
-        setTimeout(() => {
-          button.textContent = "Copy Map Data";
-          button.classList.remove("copied");
-        }, 1600);
-      } catch {
-        button.textContent = "Copy failed";
-        setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
-      }
+  const button = document.getElementById(btnId);
+  try {
+    let text = urlOrData;
+
+    // If it's a URL, fetch it first
+    if (/^https?:\/\//i.test(urlOrData)) {
+      const res = await fetch(urlOrData);
+      text = await res.text();
     }
+
+    // Try modern Clipboard API
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for Safari/iOS
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    // Success feedback
+    button.textContent = "Copied ✓";
+    button.classList.add("copied");
+    setTimeout(() => {
+      button.textContent = "Copy Map Data";
+      button.classList.remove("copied");
+    }, 1600);
+
+  } catch (err) {
+    console.error(err);
+    button.textContent = "Copy failed";
+    setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
+  }
+}
 
     searchInput.addEventListener("input", filterMaps);
     searchField.addEventListener("change", filterMaps);
