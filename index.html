@@ -47,7 +47,7 @@
       height: 180px;
       background: url("https://tse1.mm.bing.net/th/id/OIP.l554qEd9uoB8t2HdHWoT9QHaEK?rs=1&pid=ImgDetMain&o=7&rm=3")
                   no-repeat center center;
-      background-size: contain;
+      background-size: contain;   /* show full image, no crop */
       background-color: var(--surface);
       border-bottom: 1px solid var(--border);
     }
@@ -251,16 +251,22 @@
   </div>
 
   <script>
-    const repoOwner = "redwywy2013";
-    const repoName  = "Sound-Space-Maps";
-    const branch    = "main";
+    /* ========= Config ========= */
+    const repoOwner  = "redwywy2013";
+    const repoName   = "Sound-Space-Maps";
+    const branch     = "main";
     const mapsFolder = "maps";
 
-    const container   = document.getElementById("maps");
-    const searchInput = document.getElementById("searchInput");
-    const searchField = document.getElementById("searchField");
-    const statusEl    = document.getElementById("statusBar");
+    const container    = document.getElementById("maps");
+    const searchInput  = document.getElementById("searchInput");
+    const searchField  = document.getElementById("searchField");
+    const statusEl     = document.getElementById("statusBar");
 
+    /* ========= Cache so copy is instant (iOS Safari needs synchronous copy) ========= */
+    const mapCache = new Map(); // key -> text (final map data)
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    /* ========= Helpers ========= */
     function parseSSCM(text) {
       const data = {};
       text.split("\n").forEach(line => {
@@ -278,6 +284,7 @@
       return data;
     }
 
+    /* ========= Load maps (preloads map data into cache for instant copying) ========= */
     async function loadMaps() {
       try {
         const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
@@ -295,6 +302,11 @@
           const text = await resFile.text();
           const map = parseSSCM(text);
 
+          // Build card
+          const key = String(i);
+          const btnId = `btn-${i}`;
+          const needsFetch = /^https?:\/\//i.test(map.mapData);
+
           const card = document.createElement("div");
           card.className = "map-card";
           card.dataset.artist = (map.artist || "").toLowerCase();
@@ -304,9 +316,37 @@
           card.innerHTML = `
             <h2>${map.song || "Untitled"}</h2>
             <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
-            <button class="btn" id="btn-${i}" onclick="copyMap('${map.mapData}','btn-${i}')">Copy Map Data</button>
+            <button class="btn" id="${btnId}" data-key="${key}" ${needsFetch ? "disabled" : ""}>
+              ${needsFetch ? "Preparing…" : "Copy Map Data"}
+            </button>
           `;
           container.appendChild(card);
+
+          // Prime cache:
+          if (!needsFetch) {
+            mapCache.set(key, map.mapData || "");
+            const btn = document.getElementById(btnId);
+            btn.textContent = "Copy Map Data";
+            btn.disabled = false;
+          } else {
+            // Preload remote text now (outside of click)
+            (async () => {
+              try {
+                const r = await fetch(map.mapData, { cache: "force-cache" });
+                const t = await r.text();
+                mapCache.set(key, t);
+                const btn = document.getElementById(btnId);
+                if (btn) { btn.textContent = "Copy Map Data"; btn.disabled = false; }
+              } catch (e) {
+                console.error("Failed to preload map data:", e);
+                const btn = document.getElementById(btnId);
+                if (btn) { btn.textContent = "Load failed"; btn.disabled = true; }
+              }
+            })();
+          }
+
+          // Attach click listener (no async network here!)
+          document.getElementById(btnId).addEventListener("click", () => copyFromCache(key, btnId));
 
           loaded++;
           statusEl.textContent = `Loading: ${loaded} / ${sscmFiles.length} Maps`;
@@ -320,52 +360,49 @@
         statusEl.classList.add("error");
       }
     }
-    
-// Detect Safari/iOS (ignores Chrome/Android)
-const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-async function copyMap(urlOrData, btnId) {
-  const button = document.getElementById(btnId);
-  try {
-    let text = urlOrData;
+    /* ========= Copy (uses cache; Safari uses hidden textarea fallback) ========= */
+    function copyFromCache(key, btnId) {
+      const button = document.getElementById(btnId);
+      const text = mapCache.get(key);
 
-    // If it's a URL, fetch its contents first
-    if (/^https?:\/\//i.test(urlOrData)) {
-      const res = await fetch(urlOrData);
-      text = await res.text();
+      if (!text) {
+        button.textContent = "Still loading…";
+        setTimeout(() => (button.textContent = "Copy Map Data"), 1200);
+        return;
+      }
+
+      try {
+        if (isSafari) {
+          // Synchronous fallback for iOS/Safari
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        } else {
+          // Modern Clipboard API (no awaits before this)
+          navigator.clipboard.writeText(text);
+        }
+
+        button.textContent = "Copied ✓";
+        button.classList.add("copied");
+        setTimeout(() => {
+          button.textContent = "Copy Map Data";
+          button.classList.remove("copied");
+        }, 1600);
+      } catch (err) {
+        console.error(err);
+        button.textContent = "Copy failed";
+        setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
+      }
     }
 
-    if (isSafari) {
-      // Always use fallback for Safari
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    } else {
-      // Use modern Clipboard API
-      await navigator.clipboard.writeText(text);
-    }
-
-    // Success feedback
-    button.textContent = "Copied ✓";
-    button.classList.add("copied");
-    setTimeout(() => {
-      button.textContent = "Copy Map Data";
-      button.classList.remove("copied");
-    }, 1600);
-
-  } catch (err) {
-    console.error(err);
-    button.textContent = "Copy failed";
-    setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
-  }
-}
-
+    /* ========= Search ========= */
     searchInput.addEventListener("input", filterMaps);
     searchField.addEventListener("change", filterMaps);
 
@@ -388,6 +425,7 @@ async function copyMap(urlOrData, btnId) {
       });
     }
 
+    /* ========= Changelog ========= */
     const changelogTab = document.getElementById("changelogTab");
     const changelogPanel = document.getElementById("changelogPanel");
     const changelogContent = document.getElementById("changelogContent");
@@ -408,6 +446,7 @@ async function copyMap(urlOrData, btnId) {
       }
     }
 
+    /* ========= Init ========= */
     loadMaps();
     loadChangelog();
   </script>
