@@ -96,6 +96,21 @@
       width: 100%;
       flex: 1;
     }
+
+    .status-bar {
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .status-bar.done {
+      color: #4ade80;
+      font-weight: 500;
+    }
+    .status-bar.error {
+      color: #f87171;
+      font-weight: 500;
+    }
+
     .map-list {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -222,6 +237,7 @@
   </header>
 
   <main class="wrap">
+    <div id="statusBar" class="status-bar">Loading maps...</div>
     <div id="maps" class="map-list"></div>
   </main>
 
@@ -237,14 +253,14 @@
   <script>
     const repoOwner = "redwywy2013";
     const repoName  = "Sound-Space-Maps";
-    const branch    = "main";   // adjust if needed
+    const branch    = "main";
     const mapsFolder = "maps";
 
     const container   = document.getElementById("maps");
     const searchInput = document.getElementById("searchInput");
     const searchField = document.getElementById("searchField");
+    const statusEl    = document.getElementById("statusBar");
 
-    /* --- Parse SSCM --- */
     function parseSSCM(text) {
       const data = {};
       text.split("\n").forEach(line => {
@@ -262,13 +278,16 @@
       return data;
     }
 
-    /* --- Load Maps --- */
     async function loadMaps() {
       try {
         const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
         const res = await fetch(apiUrl);
+        if (!res.ok) throw new Error("Failed to load repository contents.");
         const files = await res.json();
         const sscmFiles = files.filter(f => f.name.endsWith(".sscm"));
+
+        let loaded = 0;
+        statusEl.textContent = `Loading: 0 / ${sscmFiles.length} Maps`;
 
         for (let i = 0; i < sscmFiles.length; i++) {
           const file = sscmFiles[i];
@@ -288,13 +307,20 @@
             <button class="btn" id="btn-${i}" onclick="copyMap('${map.mapData}','btn-${i}')">Copy Map Data</button>
           `;
           container.appendChild(card);
+
+          loaded++;
+          statusEl.textContent = `Loading: ${loaded} / ${sscmFiles.length} Maps`;
         }
+
+        statusEl.textContent = `Done! Successfully loaded ${sscmFiles.length} maps.`;
+        statusEl.classList.add("done");
       } catch (err) {
         console.error("Error loading maps:", err);
+        statusEl.textContent = "Error loading maps.";
+        statusEl.classList.add("error");
       }
     }
 
-    /* --- Copy Button --- */
     async function copyMap(urlOrData, btnId) {
       const button = document.getElementById(btnId);
       try {
@@ -316,7 +342,6 @@
       }
     }
 
-    /* --- Search --- */
     searchInput.addEventListener("input", filterMaps);
     searchField.addEventListener("change", filterMaps);
 
@@ -339,7 +364,6 @@
       });
     }
 
-    /* --- Changelog --- */
     const changelogTab = document.getElementById("changelogTab");
     const changelogPanel = document.getElementById("changelogPanel");
     const changelogContent = document.getElementById("changelogContent");
