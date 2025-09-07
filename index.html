@@ -1,454 +1,292 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Sound Space – Custom Maps</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root {
-      --bg:        #0e1116;
-      --surface:   #12161d;
-      --surface-2: #0f141a;
-      --border:    #1f2630;
-      --text:      #e5e7eb;
-      --muted:     #a7b0c0;
-      --accent:    #38bdf8;
-      --btn-bg:    #1b2330;
-      --btn-bg-h:  #223042;
-      --input-bg:  #0f172a;
-      --input-br:  #2a3342;
-    }
+<script>
+  /* ========= Config ========= */
+  const repoOwner  = "redwywy2013";
+  const repoName   = "Sound-Space-Maps";
+  const branch     = "main";
+  const mapsFolder = "maps";
 
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Inter", "Segoe UI", Roboto, system-ui, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      line-height: 1.5;
-    }
+  const container    = document.getElementById("maps");
+  const searchInput  = document.getElementById("searchInput");
+  const searchField  = document.getElementById("searchField");
+  const statusEl     = document.getElementById("statusBar");
 
-    .notice {
-      text-align: center;
-      background: var(--surface-2);
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    .notice b { color: var(--accent); font-weight: 500; }
+  /* ========= Cache (iOS Safari needs synchronous copy) ========= */
+  const mapCache = new Map(); // key -> text
+  // Broader Safari/iOS detection: includes iPadOS (which can report "Macintosh")
+  const ua = navigator.userAgent;
+  const isApple = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isSafariEngine = /AppleWebKit/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua);
+  const isSafari = isSafariEngine && (isApple || /Safari/i.test(ua));
 
-    /* Banner */
-    .banner {
-      width: 100%;
-      height: 180px;
-      background: url("https://tse1.mm.bing.net/th/id/OIP.l554qEd9uoB8t2HdHWoT9QHaEK?rs=1&pid=ImgDetMain&o=7&rm=3")
-                  no-repeat center center;
-      background-size: contain;   /* show full image, no crop */
-      background-color: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
+  /* ========= Manual Copy Overlay (last-resort fallback) ========= */
+  function ensureOverlay() {
+    if (document.getElementById("copyOverlay")) return;
+    const style = document.createElement("style");
+    style.textContent = `
+      .copy-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.55);
+        display: flex; align-items: center; justify-content: center; z-index: 1000;
+      }
+      .copy-modal {
+        background: #12161d; border: 1px solid #1f2630; border-radius: 12px;
+        max-width: 520px; width: calc(100% - 32px); padding: 16px;
+        color: #e5e7eb; font-family: inherit;
+      }
+      .copy-modal h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #38bdf8; }
+      .copy-modal p { margin: 0 0 8px; font-size: 14px; color: #a7b0c0; }
+      .copy-modal textarea {
+        width: 100%; height: 160px; background: #0f172a; color: #e5e7eb;
+        border: 1px solid #2a3342; border-radius: 8px; padding: 10px; font-size: 13px;
+      }
+      .copy-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+      .copy-btn {
+        background:#1b2330; border:1px solid #2a3342; color:#e5e7eb;
+        padding: 8px 12px; border-radius: 8px; cursor: pointer;
+      }
+      .copy-btn:hover { background:#223042; }
+    `;
+    document.head.appendChild(style);
 
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .header-inner {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: center;
-    }
-
-    /* Search */
-    .search {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: 100%;
-    }
-    .search input, .search select {
-      height: 40px;
-      padding: 8px 12px;
-      background: var(--input-bg);
-      color: var(--text);
-      border: 1px solid var(--input-br);
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-    }
-    .search input { flex: 1; min-width: 280px; }
-    .search select { min-width: 140px; }
-
-    /* Content */
-    .wrap {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 20px;
-      width: 100%;
-      flex: 1;
-    }
-
-    .status-bar {
-      margin-bottom: 12px;
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .status-bar.done {
-      color: #4ade80;
-      font-weight: 500;
-    }
-    .status-bar.error {
-      color: #f87171;
-      font-weight: 500;
-    }
-
-    .map-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    /* Cards */
-    .map-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      transition: transform .15s ease, border-color .15s ease, background .15s ease;
-    }
-    .map-card:hover {
-      transform: translateY(-2px);
-      border-color: #2a3342;
-      background: #131a22;
-    }
-    .map-card h2 {
-      margin: 0 0 6px;
-      font-size: 16px;
-      font-weight: 500;
-    }
-    .meta {
-      font-size: 13px;
-      margin-bottom: 8px;
-      color: var(--muted);
-    }
-    .meta .label { font-weight: 500; margin-right: 4px; color: var(--muted); }
-    .meta .value { color: var(--text); }
-
-    /* Buttons */
-    .btn {
-      margin-top: 8px;
-      background: var(--btn-bg);
-      border: 1px solid var(--input-br);
-      padding: 10px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 500;
-      color: var(--text);
-      width: 100%;
-      text-align: center;
-    }
-    .btn:hover { background: var(--btn-bg-h); }
-    .btn.copied {
-      background: #1e2d22;
-      border-color: #27412c;
-      color: #b7e4c7;
-    }
-
-    footer {
-      text-align: center;
-      padding: 14px;
-      font-size: 12px;
-      color: var(--muted);
-      border-top: 1px solid var(--border);
-      background: var(--surface-2);
-    }
-
-    /* Changelog Tab */
-    .changelog-tab {
-      position: fixed;
-      right: 0;
-      top: 40%;
-      background: var(--accent);
-      color: #000;
-      padding: 10px 14px;
-      border-radius: 8px 0 0 8px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 50;
-    }
-    .changelog-panel {
-      position: fixed;
-      right: -400px;
-      top: 0;
-      height: 100%;
-      width: 400px;
-      max-width: 90%;
-      background: var(--surface-2);
-      border-left: 1px solid var(--border);
-      padding: 20px;
-      box-shadow: -2px 0 6px rgba(0,0,0,0.5);
-      overflow-y: auto;
-      transition: right 0.3s ease;
-      z-index: 49;
-    }
-    .changelog-panel.open { right: 0; }
-    .changelog-panel h2 {
-      margin-top: 0;
-      font-size: 18px;
-      color: var(--accent);
-    }
-    .changelog-panel pre {
-      white-space: pre-wrap;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-  </style>
-</head>
-<body>
-  <div class="notice">
-    If there is a map with incorrect data or you would like extra credit towards your map,
-    please DM me on Discord <b>@redduy35</b>
-  </div>
-
-  <div class="banner"></div>
-
-  <header>
-    <div class="header-inner">
-      <div class="search">
-        <input type="text" id="searchInput" placeholder="Search by artist, title, or mapper…" />
-        <select id="searchField">
-          <option value="all">All</option>
-          <option value="artist">Artist</option>
-          <option value="title">Title</option>
-          <option value="mapper">Mapper</option>
-        </select>
+    const overlay = document.createElement("div");
+    overlay.className = "copy-overlay";
+    overlay.id = "copyOverlay";
+    overlay.innerHTML = `
+      <div class="copy-modal" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
+        <h3 id="copyTitle">Manual Copy</h3>
+        <p>If automatic copy didn’t work, long-press the text below and tap <b>Copy</b>.</p>
+        <textarea id="copyText" readonly></textarea>
+        <div class="copy-actions">
+          <button class="copy-btn" id="overlayClose">Close</button>
+        </div>
       </div>
-    </div>
-  </header>
+    `;
+    document.body.appendChild(overlay);
 
-  <main class="wrap">
-    <div id="statusBar" class="status-bar">Loading maps...</div>
-    <div id="maps" class="map-list"></div>
-  </main>
-
-  <footer>Sound Space Maps Viewer • Powered by GitHub Pages</footer>
-
-  <!-- Changelog -->
-  <div class="changelog-tab" id="changelogTab">📜 Changelog</div>
-  <div class="changelog-panel" id="changelogPanel">
-    <h2>Changelog</h2>
-    <pre id="changelogContent">Loading...</pre>
-  </div>
-
-  <script>
-    /* ========= Config ========= */
-    const repoOwner  = "redwywy2013";
-    const repoName   = "Sound-Space-Maps";
-    const branch     = "main";
-    const mapsFolder = "maps";
-
-    const container    = document.getElementById("maps");
-    const searchInput  = document.getElementById("searchInput");
-    const searchField  = document.getElementById("searchField");
-    const statusEl     = document.getElementById("statusBar");
-
-    /* ========= Cache so copy is instant (iOS Safari needs synchronous copy) ========= */
-    const mapCache = new Map(); // key -> text (final map data)
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-    /* ========= Helpers ========= */
-    function parseSSCM(text) {
-      const data = {};
-      text.split("\n").forEach(line => {
-        if (line.startsWith("Map Data:")) {
-          data.mapData = line.replace("Map Data:", "").trim();
-        } else if (line.startsWith("Artist & Title:")) {
-          data.song = line.replace("Artist & Title:", "").trim();
-          const parts = data.song.split(" - ");
-          data.artist = parts.length > 1 ? parts[0] : "";
-          data.title  = parts.length > 1 ? parts.slice(1).join(" - ") : parts[0];
-        } else if (line.startsWith("Mapper:")) {
-          data.mapper = line.replace("Mapper:", "").trim();
-        }
-      });
-      return data;
-    }
-
-    /* ========= Load maps (preloads map data into cache for instant copying) ========= */
-    async function loadMaps() {
-      try {
-        const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error("Failed to load repository contents.");
-        const files = await res.json();
-        const sscmFiles = files.filter(f => f.name.endsWith(".sscm"));
-
-        let loaded = 0;
-        statusEl.textContent = `Loading: 0 / ${sscmFiles.length} Maps`;
-
-        for (let i = 0; i < sscmFiles.length; i++) {
-          const file = sscmFiles[i];
-          const resFile = await fetch(file.download_url);
-          const text = await resFile.text();
-          const map = parseSSCM(text);
-
-          // Build card
-          const key = String(i);
-          const btnId = `btn-${i}`;
-          const needsFetch = /^https?:\/\//i.test(map.mapData);
-
-          const card = document.createElement("div");
-          card.className = "map-card";
-          card.dataset.artist = (map.artist || "").toLowerCase();
-          card.dataset.title  = (map.title  || "").toLowerCase();
-          card.dataset.mapper = (map.mapper || "").toLowerCase();
-
-          card.innerHTML = `
-            <h2>${map.song || "Untitled"}</h2>
-            <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
-            <button class="btn" id="${btnId}" data-key="${key}" ${needsFetch ? "disabled" : ""}>
-              ${needsFetch ? "Preparing…" : "Copy Map Data"}
-            </button>
-          `;
-          container.appendChild(card);
-
-          // Prime cache:
-          if (!needsFetch) {
-            mapCache.set(key, map.mapData || "");
-            const btn = document.getElementById(btnId);
-            btn.textContent = "Copy Map Data";
-            btn.disabled = false;
-          } else {
-            // Preload remote text now (outside of click)
-            (async () => {
-              try {
-                const r = await fetch(map.mapData, { cache: "force-cache" });
-                const t = await r.text();
-                mapCache.set(key, t);
-                const btn = document.getElementById(btnId);
-                if (btn) { btn.textContent = "Copy Map Data"; btn.disabled = false; }
-              } catch (e) {
-                console.error("Failed to preload map data:", e);
-                const btn = document.getElementById(btnId);
-                if (btn) { btn.textContent = "Load failed"; btn.disabled = true; }
-              }
-            })();
-          }
-
-          // Attach click listener (no async network here!)
-          document.getElementById(btnId).addEventListener("click", () => copyFromCache(key, btnId));
-
-          loaded++;
-          statusEl.textContent = `Loading: ${loaded} / ${sscmFiles.length} Maps`;
-        }
-
-        statusEl.textContent = `Done! Successfully loaded ${sscmFiles.length} maps.`;
-        statusEl.classList.add("done");
-      } catch (err) {
-        console.error("Error loading maps:", err);
-        statusEl.textContent = "Error loading maps.";
-        statusEl.classList.add("error");
-      }
-    }
-
-    /* ========= Copy (uses cache; Safari uses hidden textarea fallback) ========= */
-    function copyFromCache(key, btnId) {
-      const button = document.getElementById(btnId);
-      const text = mapCache.get(key);
-
-      if (!text) {
-        button.textContent = "Still loading…";
-        setTimeout(() => (button.textContent = "Copy Map Data"), 1200);
-        return;
-      }
-
-      try {
-        if (isSafari) {
-          // Synchronous fallback for iOS/Safari
-          const textarea = document.createElement("textarea");
-          textarea.value = text;
-          textarea.style.position = "fixed";
-          textarea.style.opacity = "0";
-          document.body.appendChild(textarea);
-          textarea.focus();
-          textarea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textarea);
-        } else {
-          // Modern Clipboard API (no awaits before this)
-          navigator.clipboard.writeText(text);
-        }
-
-        button.textContent = "Copied ✓";
-        button.classList.add("copied");
-        setTimeout(() => {
-          button.textContent = "Copy Map Data";
-          button.classList.remove("copied");
-        }, 1600);
-      } catch (err) {
-        console.error(err);
-        button.textContent = "Copy failed";
-        setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
-      }
-    }
-
-    /* ========= Search ========= */
-    searchInput.addEventListener("input", filterMaps);
-    searchField.addEventListener("change", filterMaps);
-
-    function filterMaps() {
-      const query = (searchInput.value || "").toLowerCase().trim();
-      const field = searchField.value;
-      const cards = document.querySelectorAll(".map-card");
-      cards.forEach(card => {
-        if (!query) { card.style.display = ""; return; }
-        let show = false;
-        if (field === "all") {
-          show =
-            card.dataset.artist.includes(query) ||
-            card.dataset.title.includes(query) ||
-            card.dataset.mapper.includes(query);
-        } else {
-          show = (card.dataset[field] || "").includes(query);
-        }
-        card.style.display = show ? "" : "none";
-      });
-    }
-
-    /* ========= Changelog ========= */
-    const changelogTab = document.getElementById("changelogTab");
-    const changelogPanel = document.getElementById("changelogPanel");
-    const changelogContent = document.getElementById("changelogContent");
-
-    changelogTab.addEventListener("click", () => {
-      changelogPanel.classList.toggle("open");
+    document.getElementById("overlayClose").addEventListener("click", () => {
+      overlay.remove();
     });
+  }
 
-    async function loadChangelog() {
-      try {
-        const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/changelog.txt`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Changelog not found");
-        const text = await res.text();
-        changelogContent.textContent = text;
-      } catch {
-        changelogContent.textContent = "No changelog available.";
+  function openManualCopy(text) {
+    ensureOverlay();
+    const overlay = document.getElementById("copyOverlay");
+    const ta = document.getElementById("copyText");
+    ta.value = text || "";
+    overlay.style.display = "flex";
+    // Auto-select (helps some iOS versions)
+    setTimeout(() => { ta.focus(); ta.select(); }, 50);
+  }
+
+  /* ========= Helpers ========= */
+  function parseSSCM(text) {
+    const data = {};
+    text.split("\n").forEach(line => {
+      if (line.startsWith("Map Data:")) {
+        data.mapData = line.replace("Map Data:", "").trim();
+      } else if (line.startsWith("Artist & Title:")) {
+        data.song = line.replace("Artist & Title:", "").trim();
+        const parts = data.song.split(" - ");
+        data.artist = parts.length > 1 ? parts[0] : "";
+        data.title  = parts.length > 1 ? parts.slice(1).join(" - ") : parts[0];
+      } else if (line.startsWith("Mapper:")) {
+        data.mapper = line.replace("Mapper:", "").trim();
       }
+    });
+    return data;
+  }
+
+  /* ========= Load maps (preload map data for instant copy) ========= */
+  async function loadMaps() {
+    try {
+      const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${mapsFolder}?ref=${branch}`;
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Failed to load repository contents.");
+      const files = await res.json();
+      const sscmFiles = files.filter(f => f.name.endsWith(".sscm"));
+
+      let loaded = 0;
+      statusEl.textContent = `Loading: 0 / ${sscmFiles.length} Maps`;
+
+      for (let i = 0; i < sscmFiles.length; i++) {
+        const file = sscmFiles[i];
+        const resFile = await fetch(file.download_url);
+        const text = await resFile.text();
+        const map = parseSSCM(text);
+
+        const key = String(i);
+        const btnId = `btn-${i}`;
+        const needsFetch = /^https?:\/\//i.test(map.mapData);
+
+        const card = document.createElement("div");
+        card.className = "map-card";
+        card.dataset.artist = (map.artist || "").toLowerCase();
+        card.dataset.title  = (map.title  || "").toLowerCase();
+        card.dataset.mapper = (map.mapper || "").toLowerCase();
+
+        card.innerHTML = `
+          <h2>${map.song || "Untitled"}</h2>
+          <div class="meta"><span class="label">Mapper:</span><span class="value">${map.mapper || "Unknown"}</span></div>
+          <button type="button" class="btn" id="${btnId}" data-key="${key}" ${needsFetch ? "disabled" : ""}>
+            ${needsFetch ? "Preparing…" : "Copy Map Data"}
+          </button>
+        `;
+        container.appendChild(card);
+
+        // Prime cache now (no network in click):
+        if (!needsFetch) {
+          mapCache.set(key, map.mapData || "");
+          const btn = document.getElementById(btnId);
+          btn.textContent = "Copy Map Data";
+          btn.disabled = false;
+        } else {
+          (async () => {
+            try {
+              const r = await fetch(map.mapData, { cache: "force-cache" });
+              const t = await r.text();
+              mapCache.set(key, t);
+              const btn = document.getElementById(btnId);
+              if (btn) { btn.textContent = "Copy Map Data"; btn.disabled = false; }
+            } catch (e) {
+              console.error("Failed to preload map data:", e);
+              const btn = document.getElementById(btnId);
+              if (btn) { btn.textContent = "Load failed"; btn.disabled = true; }
+            }
+          })();
+        }
+
+        document.getElementById(btnId).addEventListener("click", () => copyFromCache(key, btnId));
+
+        loaded++;
+        statusEl.textContent = `Loading: ${loaded} / ${sscmFiles.length} Maps`;
+      }
+
+      statusEl.textContent = `Done! Successfully loaded ${sscmFiles.length} maps.`;
+      statusEl.classList.add("done");
+    } catch (err) {
+      console.error("Error loading maps:", err);
+      statusEl.textContent = "Error loading maps.";
+      statusEl.classList.add("error");
+    }
+  }
+
+  /* ========= Copy (robust: modern API → execCommand → manual overlay) ========= */
+  function copyFromCache(key, btnId) {
+    const button = document.getElementById(btnId);
+    const text = mapCache.get(key);
+
+    if (!text) {
+      button.textContent = "Still loading…";
+      setTimeout(() => (button.textContent = "Copy Map Data"), 1200);
+      return;
     }
 
-    /* ========= Init ========= */
-    loadMaps();
-    loadChangelog();
-  </script>
-</body>
-</html>
+    // 1) Try modern Clipboard API (works on newer iOS/Safari in a user gesture)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        successUI(button);
+      }).catch(() => {
+        // 2) Try execCommand fallback
+        if (!execCommandCopy(text)) {
+          // 3) Manual overlay
+          openManualCopy(text);
+          failUI(button, true); // don’t say failed; overlay is open
+        } else {
+          successUI(button);
+        }
+      });
+      return;
+    }
+
+    // 2) Try execCommand fallback directly
+    if (!execCommandCopy(text)) {
+      // 3) Manual overlay
+      openManualCopy(text);
+      failUI(button, true);
+    } else {
+      successUI(button);
+    }
+  }
+
+  function execCommandCopy(text) {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length); // iOS-friendly
+      const ok = document.execCommand("copy"); // boolean result
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function successUI(button) {
+    button.textContent = "Copied ✓";
+    button.classList.add("copied");
+    setTimeout(() => {
+      button.textContent = "Copy Map Data";
+      button.classList.remove("copied");
+    }, 1600);
+  }
+
+  function failUI(button, silent = false) {
+    if (silent) return; // overlay opened
+    button.textContent = "Copy failed";
+    setTimeout(() => (button.textContent = "Copy Map Data"), 1600);
+  }
+
+  /* ========= Search ========= */
+  searchInput.addEventListener("input", filterMaps);
+  searchField.addEventListener("change", filterMaps);
+
+  function filterMaps() {
+    const query = (searchInput.value || "").toLowerCase().trim();
+    const field = searchField.value;
+    const cards = document.querySelectorAll(".map-card");
+    cards.forEach(card => {
+      if (!query) { card.style.display = ""; return; }
+      let show = false;
+      if (field === "all") {
+        show =
+          card.dataset.artist.includes(query) ||
+          card.dataset.title.includes(query) ||
+          card.dataset.mapper.includes(query);
+      } else {
+        show = (card.dataset[field] || "").includes(query);
+      }
+      card.style.display = show ? "" : "none";
+    });
+  }
+
+  /* ========= Changelog ========= */
+  const changelogTab = document.getElementById("changelogTab");
+  const changelogPanel = document.getElementById("changelogPanel");
+  const changelogContent = document.getElementById("changelogContent");
+
+  changelogTab.addEventListener("click", () => {
+    changelogPanel.classList.toggle("open");
+  });
+
+  async function loadChangelog() {
+    try {
+      const url = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/changelog.txt`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Changelog not found");
+      const text = await res.text();
+      changelogContent.textContent = text;
+    } catch {
+      changelogContent.textContent = "No changelog available.";
+    }
+  }
+
+  /* ========= Init ========= */
+  loadMaps();
+  loadChangelog();
+</script>
