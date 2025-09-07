@@ -43,9 +43,14 @@
       border-radius: 5px;
       cursor: pointer;
       font-weight: bold;
+      transition: background 0.2s ease;
     }
     button:hover {
       background: #00cc99;
+    }
+    button.copied {
+      background: #66ff66 !important;
+      color: #000;
     }
   </style>
 </head>
@@ -71,25 +76,35 @@
     // === Render maps ===
     const container = document.getElementById("maps");
 
-    maps.forEach(map => {
+    maps.forEach((map, index) => {
       const card = document.createElement("div");
       card.className = "map-card";
       card.innerHTML = `
         <h2>${map.song}</h2>
         <p><b>Mapper:</b> ${map.mapper}</p>
-        <button onclick="copyMap('${map.url}')">Copy Map Data</button>
+        <button id="btn-${index}" onclick="copyMap('${map.url}', 'btn-${index}')">Copy Map Data</button>
       `;
       container.appendChild(card);
     });
 
-    async function copyMap(url) {
+    async function copyMap(url, btnId) {
+      const button = document.getElementById(btnId);
       try {
         const res = await fetch(url);
         const text = await res.text();
         await navigator.clipboard.writeText(text);
-        alert('Copied map data for: ' + url);
+        button.textContent = "✅ Copied Successfully!";
+        button.classList.add("copied");
+
+        setTimeout(() => {
+          button.textContent = "Copy Map Data";
+          button.classList.remove("copied");
+        }, 2000); // reset after 2 seconds
       } catch (err) {
-        alert('Error: ' + err.message);
+        button.textContent = "❌ Copy Failed";
+        setTimeout(() => {
+          button.textContent = "Copy Map Data";
+        }, 2000);
       }
     }
   </script>
