@@ -17,3 +17,5 @@
   3:16 PM
     Added 75 maps from Demikuu's Repo
     HOPEFULLY fixed the IOS issue
+  3:46 PM
+    Copies the URL instead of the map data, making the IOS issue fixed :D
